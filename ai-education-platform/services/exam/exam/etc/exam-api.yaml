@@ -1,0 +1,35 @@
+Name: exam-api
+Host: 0.0.0.0
+Port: 8884
+
+DataSource: root:password@tcp(localhost:3306)/ai_education_platform?charset=utf8mb4&parseTime=true&loc=Local
+
+Redis:
+  Host: localhost:6379
+  Pass: ""
+  Type: node
+  Key: ""
+
+Auth:
+  AccessSecret: exam-secret-key
+  AccessExpire: 604800
+
+Log:
+  ServiceName: exam-api
+  Mode: file
+  Level: info
+
+RateLimit:
+  Seconds: 1
+  Quota: 100
+
+Prometheus:
+  Host: 0.0.0.0
+  Port: 9094
+  Path: /metrics
+
+Exam:
+  DefaultTimeLimit: 120
+  MaxQuestionCount: 100
+  AllowedQuestionTypes: ["multiple_choice","single_choice","fill_blank","essay","calculation","judgment"]
+  ScorePrecision: 0.5

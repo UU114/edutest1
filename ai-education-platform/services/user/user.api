@@ -1,0 +1,227 @@
+syntax = "v1"
+
+info(
+    title: "用户服务API"
+    desc: "用户管理相关接口"
+    author: "AI教育平台"
+    email: "admin@ai-education.com"
+    version: "v1"
+)
+
+type (
+    // 用户角色枚举
+    UserRole {
+        Role string `json:"role" options="[student,teacher,parent,institution]"`
+    }
+    
+    // 用户基础信息
+    UserInfo {
+        ID           int64     `json:"id"`
+        Username     string    `json:"username"`
+        Email        string    `json:"email"`
+        Phone        string    `json:"phone,omitempty"`
+        Nickname     string    `json:"nickname"`
+        Avatar       string    `json:"avatar,omitempty"`
+        Role         string    `json:"role" options="[student,teacher,parent,institution]"`
+        Status       int       `json:"status"` // 0:禁用 1:正常 2:待审核
+        CreatedAt    int64     `json:"created_at"`
+        UpdatedAt    int64     `json:"updated_at"`
+        LastLoginAt  int64     `json:"last_login_at,omitempty"`
+    }
+    
+    // 用户详细信息
+    UserProfile {
+        UserInfo
+        RealName     string    `json:"real_name,omitempty"`
+        Gender       int       `json:"gender,omitempty"` // 0:未知 1:男 2:女
+        Birthday     string    `json:"birthday,omitempty"`
+        School       string    `json:"school,omitempty"`
+        Grade        string    `json:"grade,omitempty"` // 年级
+        Class        string    `json:"class,omitempty"` // 班级
+        ParentId     int64     `json:"parent_id,omitempty"` // 家长ID
+        InstitutionId int64     `json:"institution_id,omitempty"` // 机构ID
+        Bio          string    `json:"bio,omitempty"` // 个人简介
+    }
+    
+    // 注册请求
+    RegisterRequest {
+        Username    string `json:"username" validate:"required,min=3,max=20"`
+        Password    string `json:"password" validate:"required,min=6,max=20"`
+        Email       string `json:"email" validate:"required,email"`
+        Phone       string `json:"phone,omitempty"`
+        Nickname    string `json:"nickname" validate:"required,min=1,max=30"`
+        Role        string `json:"role" validate:"required,options=[student,teacher,parent,institution]"`
+        RealName    string `json:"real_name,omitempty"`
+        School      string `json:"school,omitempty"`
+        Grade       string `json:"grade,omitempty"`
+        Class       string `json:"class,omitempty"`
+        ParentId    int64  `json:"parent_id,omitempty"`
+        InstitutionId int64  `json:"institution_id,omitempty"`
+    }
+    
+    // 登录请求
+    LoginRequest {
+        Username string `json:"username" validate:"required"`
+        Password string `json:"password" validate:"required"`
+    }
+    
+    // 登录响应
+    LoginResponse {
+        AccessToken  string `json:"access_token"`
+        RefreshToken string `json:"refresh_token"`
+        ExpiresIn    int64  `json:"expires_in"`
+        UserInfo
+    }
+    
+    // 更新用户信息请求
+    UpdateUserRequest {
+        Nickname     string `json:"nickname,omitempty"`
+        Avatar       string `json:"avatar,omitempty"`
+        RealName     string `json:"real_name,omitempty"`
+        Gender       int    `json:"gender,omitempty"`
+        Birthday     string `json:"birthday,omitempty"`
+        School       string `json:"school,omitempty"`
+        Grade        string `json:"grade,omitempty"`
+        Class        string `json:"class,omitempty"`
+        Bio          string `json:"bio,omitempty"`
+    }
+    
+    // 修改密码请求
+    ChangePasswordRequest {
+        OldPassword string `json:"old_password" validate:"required"`
+        NewPassword string `json:"new_password" validate:"required,min=6,max=20"`
+    }
+    
+    // 用户列表查询请求
+    UserListRequest {
+        Page     int    `json:"page" validate:"required,min=1"`
+        PageSize int    `json:"page_size" validate:"required,min=1,max=100"`
+        Role     string `json:"role,omitempty" options="[student,teacher,parent,institution]"`
+        Keyword  string `json:"keyword,omitempty"`
+        Status   int    `json:"status,omitempty"`
+    }
+    
+    // 用户列表响应
+    UserListResponse {
+        Total int64        `json:"total"`
+        List  []UserInfo   `json:"list"`
+    }
+    
+    // 家长孩子列表响应
+    ParentChildrenResponse {
+        Children []UserInfo `json:"children"`
+    }
+    
+    // 机构教师列表响应
+    InstitutionTeachersResponse {
+        Teachers []UserInfo `json:"teachers"`
+    }
+    
+    // 通用响应
+    CommonResponse {
+        Success bool   `json:"success"`
+        Message string `json:"message"`
+    }
+)
+
+@server(
+    jwt: Auth
+    group: user
+    prefix: /api/v1
+)
+service user-api {
+    // 获取当前用户信息
+    @handler GetUserInfo
+    get /user/info (CommonResponse) returns (UserProfile)
+    
+    // 更新用户信息
+    @handler UpdateUserInfo
+    put /user/info (UpdateUserRequest) returns (CommonResponse)
+    
+    // 修改密码
+    @handler ChangePassword
+    put /user/password (ChangePasswordRequest) returns (CommonResponse)
+    
+    // 用户登出
+    @handler Logout
+    post /user/logout (CommonResponse) returns (CommonResponse)
+    
+    // 刷新token
+    @handler RefreshToken
+    post /user/refresh (CommonResponse) returns (LoginResponse)
+}
+
+@server(
+    group: user
+    prefix: /api/v1
+)
+service user-api {
+    // 用户注册
+    @handler Register
+    post /user/register (RegisterRequest) returns (CommonResponse)
+    
+    // 用户登录
+    @handler Login
+    post /user/login (LoginRequest) returns (LoginResponse)
+}
+
+@server(
+    jwt: Auth
+    group: admin
+    prefix: /api/v1/admin
+)
+service user-api {
+    // 获取用户列表
+    @handler GetUserList
+    get /users (UserListRequest) returns (UserListResponse)
+    
+    // 获取用户详情
+    @handler GetUserDetail
+    get /user/:id (CommonResponse) returns (UserProfile)
+    
+    // 更新用户状态
+    @handler UpdateUserStatus
+    put /user/:id/status (CommonResponse) returns (CommonResponse)
+    
+    // 删除用户
+    @handler DeleteUser
+    delete /user/:id (CommonResponse) returns (CommonResponse)
+}
+
+@server(
+    jwt: Auth
+    group: parent
+    prefix: /api/v1/parent
+)
+service user-api {
+    // 获取家长的孩子列表
+    @handler GetParentChildren
+    get /children (CommonResponse) returns (ParentChildrenResponse)
+    
+    // 绑定孩子
+    @handler BindChild
+    post /child/bind (CommonResponse) returns (CommonResponse)
+    
+    // 解绑孩子
+    @handler UnbindChild
+    delete /child/:id (CommonResponse) returns (CommonResponse)
+}
+
+@server(
+    jwt: Auth
+    group: institution
+    prefix: /api/v1/institution
+)
+service user-api {
+    // 获取机构的教师列表
+    @handler GetInstitutionTeachers
+    get /teachers (CommonResponse) returns (InstitutionTeachersResponse)
+    
+    // 添加教师
+    @handler AddTeacher
+    post /teacher (RegisterRequest) returns (CommonResponse)
+    
+    // 移除教师
+    @handler RemoveTeacher
+    delete /teacher/:id (CommonResponse) returns (CommonResponse)
+}

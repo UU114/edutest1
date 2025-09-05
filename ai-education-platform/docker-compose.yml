@@ -1,0 +1,201 @@
+version: '3.8'
+
+services:
+  # MySQL 数据库
+  mysql:
+    image: mysql:8.0
+    container_name: ai-education-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: ai_education_platform
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    networks:
+      - ai-education-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Redis 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: ai-education-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ai-education-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      timeout: 10s
+      retries: 5
+
+  # 用户服务
+  user-service:
+    build: .
+    container_name: ai-education-user-service
+    ports:
+      - "8881:8881"
+    environment:
+      - APP_ENV=production
+    volumes:
+      - ./services/user/user/etc/user-api.yaml:/app/etc/user-api.yaml
+      - ./logs:/app/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ai-education-network
+    restart: unless-stopped
+    command: ["./user-service", "-f", "etc/user-api.yaml"]
+
+  # 课程服务
+  course-service:
+    build: .
+    container_name: ai-education-course-service
+    ports:
+      - "8882:8882"
+    environment:
+      - APP_ENV=production
+    volumes:
+      - ./services/course/course/etc/course-api.yaml:/app/etc/course-api.yaml
+      - ./logs:/app/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ai-education-network
+    restart: unless-stopped
+    command: ["./course-service", "-f", "etc/course-api.yaml"]
+
+  # AI助手服务
+  ai-service:
+    build: .
+    container_name: ai-education-ai-service
+    ports:
+      - "8883:8883"
+    environment:
+      - APP_ENV=production
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
+    volumes:
+      - ./services/ai_assistant/ai_assistant/etc/ai_assistant-api.yaml:/app/etc/ai_assistant-api.yaml
+      - ./logs:/app/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ai-education-network
+    restart: unless-stopped
+    command: ["./ai-service", "-f", "etc/ai_assistant-api.yaml"]
+
+  # 考试服务
+  exam-service:
+    build: .
+    container_name: ai-education-exam-service
+    ports:
+      - "8884:8884"
+    environment:
+      - APP_ENV=production
+    volumes:
+      - ./services/exam/exam/etc/exam-api.yaml:/app/etc/exam-api.yaml
+      - ./logs:/app/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ai-education-network
+    restart: unless-stopped
+    command: ["./exam-service", "-f", "etc/exam-api.yaml"]
+
+  # Nginx 反向代理
+  nginx:
+    image: nginx:alpine
+    container_name: ai-education-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - user-service
+      - course-service
+      - ai-service
+      - exam-service
+    networks:
+      - ai-education-network
+    restart: unless-stopped
+
+  # Prometheus 监控
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ai-education-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - ai-education-network
+    restart: unless-stopped
+
+  # Grafana 可视化
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ai-education-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    networks:
+      - ai-education-network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  ai-education-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

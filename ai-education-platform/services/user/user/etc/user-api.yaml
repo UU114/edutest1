@@ -1,0 +1,35 @@
+Name: user-api
+Host: 0.0.0.0
+Port: 8881
+
+# 数据库配置
+DataSource: root:password@tcp(localhost:3306)/ai_education_platform?charset=utf8mb4&parseTime=true&loc=Local
+
+# Redis配置
+Redis:
+  Host: localhost:6379
+  Pass: ""
+  Type: node
+  Key: user-service
+
+# JWT配置
+Auth:
+  AccessSecret: your-access-secret-key
+  AccessExpire: 604800
+
+# 日志配置
+Log:
+  ServiceName: user-api
+  Mode: console
+  Level: info
+
+# 限流配置
+RateLimit:
+  Seconds: 1
+  Quota: 100
+
+# 中间件配置
+Prometheus:
+  Host: 0.0.0.0
+  Port: 9081
+  Path: /metrics

@@ -1,0 +1,36 @@
+Name: ai-assistant-api
+Host: 0.0.0.0
+Port: 8883
+
+DataSource: root:password@tcp(localhost:3306)/ai_education_platform?charset=utf8mb4&parseTime=true&loc=Local
+
+Redis:
+  Host: localhost:6379
+  Pass: ""
+  Type: node
+  Key: ""
+
+Auth:
+  AccessSecret: ai-assistant-secret-key
+  AccessExpire: 604800
+
+Log:
+  ServiceName: ai-assistant-api
+  Mode: file
+  Level: info
+
+RateLimit:
+  Seconds: 1
+  Quota: 100
+
+Prometheus:
+  Host: 0.0.0.0
+  Port: 9093
+  Path: /metrics
+
+AI:
+  APIKey: your-ai-api-key
+  APIEndpoint: https://api.openai.com/v1/chat/completions
+  Model: gpt-3.5-turbo
+  MaxTokens: 2000
+  Temperature: 0.7
